@@ -33,6 +33,15 @@
   import ImportedModel from '$lib/3d/ImportedModel.svelte'
   import { type Finger, FINGERS, SolvedHand } from '$lib/hand'
   import { refine } from '../handoptim'
+  import { DEFAULT_THUMB_REST } from '$lib/thumbfit'
+  import {
+    configDelta,
+    fitThumb,
+    separateLeftThumbs,
+    shiftedClusterMatrix,
+    trackballIndex,
+    type ThumbFit,
+  } from './thumbFitHelpers'
   import Keyboard from '$lib/3d/Keyboard.svelte'
   import AddButton from '$lib/3d/AddButton.svelte'
   import * as flags from '$lib/flags'
@@ -232,20 +241,25 @@
       return proto
     })
   }
+  /** Set the pose of the n^th key (or its column or cluster) from a matrix in the config's frame. */
+  function setPose(proto: CosmosKeyboard, n: number, mode: 'key' | 'column' | 'cluster', obj: Matrix4) {
+    const oldPosition = transformationCenter(n, proto, mode, true)
+    obj.premultiply(oldPosition.evaluate({ flat: false }, new Trsf()).Matrix4().invert())
+    const { position, rotation } = toPosRotation(obj)
+
+    const { key, column, cluster } = nthKey(proto, n)
+    const update = (k: CosmosKey | CosmosCluster) => {
+      k.position = position
+      k.rotation = rotation
+    }
+    if (mode == 'key') update(key)
+    if (mode == 'column') update(column)
+    if (mode == 'cluster') update(cluster)
+  }
+
   function onMove(obj: Matrix4, change: boolean) {
     ;(change ? protoConfig : tempConfig).update((proto) => {
-      const oldPosition = transformationCenter($clickedKey!, proto, $selectMode, true)
-      obj.premultiply(oldPosition.evaluate({ flat: false }, new Trsf()).Matrix4().invert())
-      const { position, rotation } = toPosRotation(obj)
-
-      const { key, column, cluster } = nthKey(proto, $clickedKey!)
-      const update = (k: CosmosKey | CosmosCluster) => {
-        k.position = position
-        k.rotation = rotation
-      }
-      if ($selectMode == 'key') update(key)
-      if ($selectMode == 'column') update(column)
-      if ($selectMode == 'cluster') update(cluster)
+      setPose(proto, $clickedKey!, $selectMode, obj)
       ;(proto as TempConfig).fromProto = false
       return proto
     })
@@ -534,7 +548,7 @@
     return ik
   }
 
-  function theBigFit(fitConfs: FitConfs, side: HandSide) {
+  function theBigFit(fitConfs: FitConfs, side: HandSide, thumbAtRest = false) {
     const conf = fitConfs[side]!
     const isUnibody = fitConfs.isUnibody
     const isUnibodyLeft = side == 'left' && fitConfs.isUnibody
@@ -544,10 +558,50 @@
         middleFinger: pos(conf, findKeyByAttr(conf, isUnibodyLeft, 'home', 'middle'), side, isUnibody),
         ringFinger: pos(conf, findKeyByAttr(conf, isUnibodyLeft, 'home', 'ring'), side, isUnibody),
         pinky: pos(conf, findKeyByAttr(conf, isUnibodyLeft, 'home', 'pinky'), side, isUnibody),
-        thumb: pos(conf, findKeyByAttr(conf, isUnibodyLeft, 'home', 'thumb'), side, isUnibody),
+        // A thumb at rest goes where the hand puts it, so it must not pull the hand toward a thumb key.
+        thumb: thumbAtRest
+          ? undefined
+          : pos(conf, findKeyByAttr(conf, isUnibodyLeft, 'home', 'thumb'), side, isUnibody),
       },
       side
     )
+  }
+
+  /** When on, the thumb rests where the scan puts it and each trackball is compared with that spot. */
+  let thumbFitOn = false
+  let thumbOpts = { ...DEFAULT_THUMB_REST }
+  let thumbFits: Partial<Record<HandSide, ThumbFit>> = {}
+
+  function fitAllHands(
+    sides: HandSide[],
+    confs: FitConfs,
+    thumbsAtRest: boolean,
+    opts: typeof thumbOpts
+  ) {
+    const fits: typeof thumbFits = {}
+    for (const side of sides) {
+      if (!confs[side]) continue
+      theBigFit(confs, side, thumbsAtRest)
+      if (!thumbsAtRest) continue
+      const fit = fitThumb(hands[side]!, confs[side]!, side, confs.isUnibody, opts)
+      if (fit) fits[side] = fit
+    }
+    thumbFits = fits
+    hands = hands
+  }
+
+  function moveBallsUnderThumbs() {
+    protoConfig.update((proto) => {
+      if (thumbFits.left && thumbFits.right) separateLeftThumbs(proto)
+      for (const side of handSides) {
+        const fit = thumbFits[side]
+        const index = trackballIndex(proto, side)
+        if (!fit || index === undefined) continue
+        // Move the whole thumb cluster so the buttons keep their places around the ball.
+        setPose(proto, index, 'cluster', shiftedClusterMatrix(proto, index, configDelta(fit)))
+      }
+      return proto
+    })
   }
 
   type FitConfs = Record<HandSide, Cuttleform | undefined> & { isUnibody: boolean }
@@ -560,10 +614,7 @@
   $: if (conf) fitConfs = toFitConf(conf)
   $: if ($tempConfig) fitConfs = toFitConf(fromCosmosConfig($tempConfig, true)) // Because this is how conf is
   $: handSides = HAND_SIDES.filter((s) => !!handCenter(s, center, geometry) && !!fitConfs[s])
-  $: if (jointsJSON && geometry)
-    handSides.forEach((side) => {
-      if (fitConfs[side]) theBigFit(fitConfs, side)
-    })
+  $: if (jointsJSON && geometry) fitAllHands(handSides, fitConfs, thumbFitOn, thumbOpts)
 
   function easeInOutQuad(x: number): number {
     return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2
@@ -830,8 +881,44 @@
           </button>
         {/if}
         <button class="button" on:click={() => toggleplay(sentence)}>Simulate</button>
+        <button
+          class="button"
+          class:bg-teal-500!={thumbFitOn}
+          on:click={() => (thumbFitOn = !thumbFitOn)}>Thumb Fit</button
+        >
       {/if}
     </div>
+    {#if jointsJSON && thumbFitOn}
+      <div
+        class="mx-auto mt-2 w-max rounded bg-white/90 dark:bg-gray-900/90 px-4 py-2 text-sm flex flex-col gap-1"
+      >
+        <label class="flex items-center gap-2">
+          Thumb bend
+          <input type="range" min="0" max="2" step="0.05" bind:value={thumbOpts.curl} />
+          {Math.round(thumbOpts.curl * 100)}%
+        </label>
+        <label class="flex items-center gap-2">
+          Thumb toward index
+          <input type="range" min="-30" max="30" step="1" bind:value={thumbOpts.swing} />
+          {thumbOpts.swing}°
+        </label>
+        {#each handSides as side (side)}
+          {@const tf = thumbFits[side]}
+          <div>
+            {side == 'left' ? 'Left' : 'Right'}:
+            {#if tf}
+              ball is {tf.current.distanceTo(tf.target).toFixed(1)} mm from where your thumb rests
+            {:else}
+              needs exactly one trackball to compare
+            {/if}
+          </div>
+        {/each}
+        {#if Object.keys(thumbFits).length}
+          <button class="button" on:click={moveBallsUnderThumbs}>Move thumb clusters under thumbs</button
+          >
+        {/if}
+      </div>
+    {/if}
   {/if}
   {#if $clickedKey !== null}
     <div class="relative flex flex-1 justify-center">
@@ -1815,6 +1902,17 @@
       {@const hand = hands[side]}
       {#if cent && hand}
         <T.Group position={[-cent[0], -cent[1], -cent[2]]}>
+          {#if thumbFitOn && thumbFits[side]}
+            {@const tf = thumbFits[side]}
+            <T.Mesh position={tf.target.toArray()}>
+              <T.SphereGeometry args={[tf.diameter / 2, 32, 16]} />
+              <T.MeshBasicMaterial color="#14b8a6" wireframe transparent opacity={0.5} />
+            </T.Mesh>
+            <T.Mesh position={tf.rest.pad.toArray()}>
+              <T.SphereGeometry args={[2, 12, 8]} />
+              <T.MeshBasicMaterial color="#f97316" />
+            </T.Mesh>
+          {/if}
           <T.Group position={handPosition[side]} rotation={handRotation[side]} let:ref={handRef}>
             <HandModel reverse={side == 'right'} {hand} />
             {#if handControlsReady}
