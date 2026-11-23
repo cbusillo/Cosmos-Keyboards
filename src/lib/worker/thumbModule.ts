@@ -138,28 +138,41 @@ export function thumbSeam(c: Cuttleform, geo: Geometry): SeamResult {
 
   // In strips along the seam, center it between the nearest finger and thumb sockets.
   const STEP = 2
-  const WINDOW = 10
-  const raw: (number | undefined)[] = []
+  // Center the seam where the nearest finger socket and the nearest thumb socket are equally far away,
+  // a dividing line between the two groups. Past the keys it heads out between them, so each group's
+  // walls stay with it instead of being sliced lengthwise.
+  const nearest = (pts: [number, number][], t: number, s: number) => {
+    let best = Infinity
+    for (const [pt, ps] of pts) {
+      const d = (pt - t) * (pt - t) + (ps - s) * (ps - s)
+      if (d < best) best = d
+    }
+    return Math.sqrt(best)
+  }
+  const balance = (t: number, s: number) => nearest(fingerPts, t, s) - nearest(thumbPts, t, s)
+  const sLo = Math.min(...all.map(p => p[1])) - 80
+  const sHi = Math.max(...all.map(p => p[1])) + 80
   const ts: number[] = []
+  const filled: number[] = []
   for (let t = tMin; t <= tMax; t += STEP) {
     ts.push(t)
-    const near = (pts: [number, number][]) => pts.filter(p => Math.abs(p[0] - t) < WINDOW).map(p => p[1])
-    const f = near(fingerPts)
-    const th = near(thumbPts)
-    if (f.length && th.length) raw.push((Math.max(...f) + Math.min(...th)) / 2)
-    else if (f.length) raw.push(Math.max(...f) + half + 2)
-    else if (th.length) raw.push(Math.min(...th) - half - 2)
-    else raw.push(undefined)
-  }
-  // Strips with no sockets take the nearest strip's offset, so the seam runs straight off the ends.
-  const filled = raw.map((s, i) => {
-    if (s !== undefined) return s
-    for (let d = 1; d < raw.length; d++) {
-      const v = raw[i - d] ?? raw[i + d]
-      if (v !== undefined) return v
+    // Walk from the finger side toward the thumb side until the thumbs become nearer, then refine.
+    let lo = sLo
+    let hi = sHi
+    for (let s = sLo; s <= sHi; s += 4) {
+      if (balance(t, s) > 0) {
+        hi = s
+        lo = s - 4
+        break
+      }
     }
-    return 0
-  })
+    for (let k = 0; k < 8; k++) {
+      const mid = (lo + hi) / 2
+      if (balance(t, mid) > 0) hi = mid
+      else lo = mid
+    }
+    filled.push((lo + hi) / 2)
+  }
   // Smooth the bends a little so the seam is easy to print.
   const smooth = filled.map((_, i) => {
     const w = filled.slice(Math.max(0, i - 2), i + 3)

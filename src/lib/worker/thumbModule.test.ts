@@ -77,3 +77,23 @@ test('the thumb module setting survives encoding and reaches the model config', 
   expect(decoded.thumbModule).toEqual({ gap: 3.5, angle: -12, offset: 1.5 })
   expect(fromCosmosConfig(decoded).right!.thumbModule).toEqual(decoded.thumbModule)
 })
+
+test('case walls stay with their own keys instead of being sliced along the seam', () => {
+  const conf = separatedDefault()
+  conf.thumbModule = { gap: 3, angle: 0, offset: 0 }
+  const geo = newGeometry(conf)
+  const result = thumbSeam(conf, geo)
+  if (!('seam' in result)) throw new Error(result.error)
+  const { seam } = result
+  const plane = (v: Vector) => [v.dot(geo.worldX), v.dot(geo.worldY)]
+  const keys = conf.keys.map((k, i) => ({ thumb: k.cluster == 'thumbs', p: plane(geo.keyHolesTrsfs[i].origin()) }))
+  for (const w of geo.allWallCriticalPoints()) {
+    const p = plane(w.bo.origin())
+    const nearest = keys.reduce((a, b) => Math.hypot(b.p[0] - p[0], b.p[1] - p[1]) < Math.hypot(a.p[0] - p[0], a.p[1] - p[1]) ? b : a)
+    const t = p[0] * seam.along[0] + p[1] * seam.along[1]
+    const across = p[0] * seam.normal[0] + p[1] * seam.normal[1] - seamOffsetAt(seam, t)
+    // Points right at the seam belong to neither side; everything else follows its nearest key.
+    if (Math.abs(across) < seam.gap / 2 + 5) continue
+    expect(across > 0).toBe(nearest.thumb)
+  }
+})
