@@ -25,17 +25,19 @@ function separatedDefault(distance = 12): Cuttleform {
   return conf
 }
 
-/** Distance of a key's origin from the seam's center line, positive toward the thumbs. */
-function across(conf: Cuttleform, i: number) {
+/** Distance of each key's origin from the seam's center line, positive toward the thumbs. */
+function acrossAll(conf: Cuttleform) {
   const geo = newGeometry(conf)
   const result = thumbSeam(conf, geo)
   if (!('seam' in result)) throw new Error(result.error)
   const { seam } = result
-  const o = geo.keyHolesTrsfs[i].origin()
-  const p = [o.dot(geo.worldX), o.dot(geo.worldY)]
-  const t = p[0] * seam.along[0] + p[1] * seam.along[1]
-  const s = p[0] * seam.normal[0] + p[1] * seam.normal[1]
-  return s - seamOffsetAt(seam, t)
+  return conf.keys.map((_, i) => {
+    const o = geo.keyHolesTrsfs[i].origin()
+    const p = [o.dot(geo.worldX), o.dot(geo.worldY)]
+    const t = p[0] * seam.along[0] + p[1] * seam.along[1]
+    const s = p[0] * seam.normal[0] + p[1] * seam.normal[1]
+    return s - seamOffsetAt(seam, t)
+  })
 }
 
 test('the default keyboard refuses a seam where its thumb and finger keys nearly touch', () => {
@@ -48,9 +50,10 @@ test('a separated thumb cluster splits with every thumb key on the module and ev
   const geo = newGeometry(conf)
   const result = thumbSeam(conf, geo)
   expect('seam' in result).toBe(true)
+  const across = acrossAll(conf)
   conf.keys.forEach((k, i) => {
-    if (k.cluster == 'thumbs') expect(across(conf, i)).toBeGreaterThan(2)
-    else expect(across(conf, i)).toBeLessThan(-2)
+    if (k.cluster == 'thumbs') expect(across[i]).toBeGreaterThan(2)
+    else expect(across[i]).toBeLessThan(-2)
   })
   if ('seam' in result) {
     expect(strapBolts(geo, result.seam, 'main').length).toBeGreaterThan(0)
