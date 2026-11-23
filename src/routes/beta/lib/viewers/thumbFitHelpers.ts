@@ -6,8 +6,9 @@ import { keyPosition, keyPositionTop } from '$lib/worker/modeling/transformation
 import { Matrix4, Vector3 } from 'three'
 import { type HandSide, transformationCenter } from './viewer3dHelpers'
 
-/** The trackball part's origin is this far above the ball's center (see trackball-gen.ts). */
-const BALL_CENTER_BELOW_ORIGIN = 4
+/** Trackball parts, and how far each part's origin sits above its ball's center (see simpleparts.ts). */
+const BALL_CENTER_BELOW_ORIGIN: Record<string, number> = { 'trackball': 4, 'trackball-splitball': 0 }
+const isTrackballType = (type: string | undefined) => !!type && type in BALL_CENTER_BELOW_ORIGIN
 
 export interface ThumbFit {
   rest: ThumbRest
@@ -39,11 +40,11 @@ const KEY_FOOTPRINT = 19
 /** Space between neighboring thumb keys' footprints, in mm. */
 const KEY_CLEARANCE = 1
 
-const isTrackball = (k: CuttleKey) => k.type == 'trackball'
+const isTrackball = (k: CuttleKey) => isTrackballType(k.type)
 
 /** Center of a trackball key, in the config's frame (a split's left half is mirrored into the right's). */
 function ballCenter(c: Cuttleform, k: CuttleKey) {
-  return keyPosition(c, k, false).pretranslated(0, 0, -BALL_CENTER_BELOW_ORIGIN).origin()
+  return keyPosition(c, k, false).pretranslated(0, 0, -BALL_CENTER_BELOW_ORIGIN[k.type]).origin()
 }
 
 const mirror = (v: Vector3, side: HandSide, isUnibody: boolean) => side == 'left' && !isUnibody ? v.setX(-v.x) : v
@@ -57,6 +58,7 @@ export function fitThumb(hand: SolvedHand, conf: Cuttleform, side: HandSide, isU
   const balls = conf.keys.filter(isTrackball)
   if (balls.length != 1) return undefined
   const ball = balls[0]
+  // The Split-Ball only takes a 34 mm ball; the plain trackball names its size.
   const diameter = parseFloat((ball as any).variant?.size) || 34
   const current = mirror(ballCenter(conf, ball), side, isUnibody)
   const keys = conf.keys
@@ -95,7 +97,7 @@ export function trackballIndex(proto: CosmosKeyboard, side: HandSide): number | 
   for (const cluster of proto.clusters) {
     for (const column of cluster.clusters) {
       for (const _ of column.keys) {
-        if (cluster.side == side && nthPartType(proto, i, 'key') == 'trackball') found.push(i)
+        if (cluster.side == side && isTrackballType(nthPartType(proto, i, 'key'))) found.push(i)
         i++
       }
     }
@@ -146,14 +148,15 @@ export function arrangeThumbKeys(proto: CosmosKeyboard, side: HandSide, fit: Thu
   const ballIndex = trackballIndex(proto, side)
   if (ballIndex === undefined) return []
   // cosmosKeyPosition and the hands share axes but may differ by a translation; the ball's center anchors it.
-  const ballCenterProto = new Vector3(0, 0, -BALL_CENTER_BELOW_ORIGIN).applyMatrix4(protoKeyMatrix(proto, ballIndex))
+  const ballType = nthPartType(proto, ballIndex, 'key')
+  const ballCenterProto = new Vector3(0, 0, -BALL_CENTER_BELOW_ORIGIN[ballType]).applyMatrix4(protoKeyMatrix(proto, ballIndex))
   const toProto = new Vector3().subVectors(ballCenterProto, fit.current)
   const indices: number[] = []
   let i = 0
   for (const cluster of proto.clusters) {
     for (const column of cluster.clusters) {
       for (const _ of column.keys) {
-        if (cluster.side == side && cluster.name == 'thumbs' && i != ballIndex && nthPartType(proto, i, 'key') != 'trackball') indices.push(i)
+        if (cluster.side == side && cluster.name == 'thumbs' && i != ballIndex && !isTrackballType(nthPartType(proto, i, 'key'))) indices.push(i)
         i++
       }
     }

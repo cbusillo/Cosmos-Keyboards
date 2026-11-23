@@ -1454,7 +1454,7 @@
   <Field
     name="Clamp Mount"
     icon="screw"
-    help="Two M4 bolts come up through a metal Arca-Swiss rail and the bottom plate into hex nuts held in bosses inside the case, for mounting on a camera arm or desk clamp."
+    help="Two 1/4-20 bolts through the bottom plate into a metal Arca-Swiss plate, for mounting on a camera arm or desk clamp. Bosses inside the case hold a 1/4-20 nut, or seat a screw head when the plate has threaded holes. Set the bolt spacing to match your plate."
   >
     <CheckboxOpt
       bind:value={$protoConfig.clampMount}

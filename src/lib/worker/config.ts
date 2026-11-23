@@ -136,7 +136,7 @@ export interface SpecificCuttleform<S> {
     footDiameter: number
     footHeight: number
   }
-  /** Two bolts through the bottom plate for mounting the keyboard on an Arca-Swiss rail. */
+  /** Two 1/4-20 bolts through the bottom plate for mounting the keyboard on an Arca-Swiss plate. */
   clampMount?: ClampMount
   shell: S
 }

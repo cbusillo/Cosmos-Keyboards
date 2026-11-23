@@ -393,16 +393,18 @@ interface PlateParams {
 }
 
 /**
- * Clamp mount: two M4 bolts come up from below through a metal Arca-Swiss rail and the plate, into
- * hex nuts held in bosses on the plate's inner face. Metal threads take the load, and two bolts stop
- * the keyboard twisting on the rail.
+ * Clamp mount: two 1/4-20 bolts through the plate into a metal Arca-Swiss plate or rail (Arca slots
+ * and threads are 1/4-20). Each hole has a boss on the plate's inner face with a hex pocket. With a
+ * plate whose screws point up, the pocket holds a 1/4-20 nut; with a plate that has threaded holes,
+ * a screw goes in from inside and the pocket seats its head or washer. Two bolts stop the keyboard
+ * twisting on the plate.
  */
 const MOUNT = {
-  holeDiameter: 4.5, // M4 clearance
-  bossDiameter: 13,
-  bossHeight: 6, // above the plate's inner face
-  nutAcrossFlats: 7.3, // M4 nut is 7 mm across flats, plus printing clearance
-  nutDepth: 3.6, // M4 nut is 3.2 mm thick
+  holeDiameter: 6.8, // 1/4" clearance
+  bossDiameter: 19,
+  bossHeight: 8, // above the plate's inner face
+  nutAcrossFlats: 11.5, // 1/4-20 hex nut is 7/16" (11.1 mm) across flats, plus printing clearance
+  nutDepth: 6, // 1/4-20 hex nut is 7/32" (5.6 mm) thick
 }
 
 /** Bolt centers of the clamp mount, in the plate sketch's coordinates. */
