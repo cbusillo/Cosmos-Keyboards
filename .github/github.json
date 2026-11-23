@@ -1,0 +1,12 @@
+{
+  "defaultBranch": "main",
+  "qualityGate": {
+    "inspection": {
+      "ide": "WebStorm",
+      "scopePreference": [
+        "changed_files"
+      ],
+      "profile": ".idea/inspectionProfiles/Project_Default.xml"
+    }
+  }
+}
