@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test'
 import { cuttleConf, type Cuttleform, newGeometry } from './config'
 import { fromCosmosConfig, toCosmosConfig } from './config.cosmos'
 import { decodeConfigIdk, encodeCosmosConfig, serializeCosmosConfig } from './config.serialize'
+import { clampMountRibs } from './model'
 import { Vector } from './modeling/transformation'
 import ETrsf from './modeling/transformation-ext'
 import { screwsPerSide, seamOffsetAt, strapBolts, thumbSeam } from './thumbModule'
@@ -98,5 +99,21 @@ test('case walls stay with their own keys instead of being sliced along the seam
     // Points right at the seam belong to neither side; everything else follows its nearest key.
     if (Math.abs(across) < seam.gap / 2 + 5) continue
     expect(across > 0).toBe(nearest.thumb)
+  }
+})
+
+test('mount ribs stay on the main case and never cross into the thumb module', () => {
+  const conf = { ...separatedDefault(), clampMount: { offsetX: 0, offsetY: 0 } }
+  const geo = newGeometry(conf)
+  const result = thumbSeam(conf, geo)
+  if (!('seam' in result)) throw new Error(result.error)
+  const { seam } = result
+  const ribs = clampMountRibs(conf, geo)
+  expect(ribs.length).toBeGreaterThan(0)
+  for (const rib of ribs) {
+    for (const [u, v] of [rib.from, rib.to]) {
+      const t = u * seam.along[0] + v * seam.along[1]
+      expect(u * seam.normal[0] + v * seam.normal[1] - seamOffsetAt(seam, t)).toBeLessThan(-seam.gap / 2)
+    }
   }
 })

@@ -4,13 +4,14 @@ import { SCREWS } from '$lib/geometry/screws'
 import { processPlate } from '@pro/art'
 import { wallBezier } from '@pro/rounded'
 import { makeStiltsPlate, makeStiltsPlateSimpleMesh, splitStiltsScrewInserts } from '@pro/stiltsModel'
-import { cast, CornerFinder, downcast, draw, drawCircle, drawPolysides, drawRoundedRectangle, Face, loft, makeCylinder, type Sketch, Sketcher, Solid } from 'replicad'
+import { cast, CornerFinder, downcast, draw, drawCircle, drawPolysides, drawRoundedRectangle, Face, loft, makeBox, makeCylinder, type Sketch, Sketcher, Solid } from 'replicad'
 import type { TiltGeometry } from './cachedGeometry'
 import { createTriangleMap } from './concaveman'
 import { convertToMaybeCustomConnectors, type Cuttleform, type Geometry } from './config'
 import type { ConnectorMaybeCustom, CustomConnector } from './config.cosmos'
 import {
   bezierPatch,
+  componentBoxes,
   type CriticalPoints,
   joinWalls,
   keyCriticalPoints,
@@ -38,7 +39,7 @@ import { Splitter } from './modeling/splitter'
 import Trsf from './modeling/transformation'
 import { Vector } from './modeling/transformation'
 import { keyHole } from './socketsLoader'
-import { addStrapBosses } from './thumbModule'
+import { addStrapBosses, seamOffsetAt, thumbSeam } from './thumbModule'
 import { mapObj, sum } from './util'
 
 const ACCENT_HEIGHT = 1.5
@@ -407,6 +408,99 @@ const MOUNT = {
   nutAcrossFlats: 11.5, // 1/4-20 hex nut is 7/16" (11.1 mm) across flats, plus printing clearance
   /** Plastic between the plate's outer face and the nut, in mm. The arm screw must reach past it. */
   floor: 2,
+  /** Ribs on the plate's inner face run from the nut boss toward the plate screws by the walls. */
+  ribWidth: 3,
+  ribMaxHeight: 10,
+  ribMinHeight: 4,
+  /** Ribs stop this far short of a plate screw, leaving room for the wall's screw insert, in mm. */
+  ribStopShort: 10,
+  /** Space kept between a rib and anything above it, in mm. */
+  ribClearance: 2,
+}
+
+interface Rib {
+  from: [number, number]
+  to: [number, number]
+  height: number
+}
+
+/**
+ * Ribs tying the mount's boss to the plate screws, which the stiff case walls hold. Each is as tall
+ * as the parts above it allow (switches, trackball, microcontroller) and is shortened where they come
+ * too close. With a thumb module, only screws on the main case's side get ribs.
+ */
+export function clampMountRibs(c: Cuttleform, geo: Geometry): Rib[] {
+  const [center] = clampMountPositions(c, geo)
+  if (!center || !geo.keyHolesTrsfs) return []
+  const toPlate = (v: Vector) => [v.dot(geo.worldX), v.dot(geo.worldY), v.dot(geo.worldZ) - geo.bottomZ] as [number, number, number]
+
+  // Everything that hangs down toward the plate, as outlines in plate coordinates with their lowest height.
+  const obstacles = componentBoxes(c, geo).map(box => {
+    const pts = box.points.map(p => toPlate(box.origin.apply(p)))
+    return { poly: pts.map(p => [p[0], p[1]] as [number, number]), bottom: Math.min(...pts.map(p => p[2])) }
+  })
+  const inside = (poly: [number, number][], [x, y]: [number, number]) => {
+    let hit = false
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i]
+      const [xj, yj] = poly[j]
+      if ((yi > y) != (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) hit = !hit
+    }
+    return hit
+  }
+  const edgeDistance = (poly: [number, number][], p: [number, number]) =>
+    Math.min(...poly.map(([x, y], i) => {
+      const [x2, y2] = poly[(i + 1) % poly.length]
+      const dx = x2 - x
+      const dy = y2 - y
+      const t = Math.max(0, Math.min(1, ((p[0] - x) * dx + (p[1] - y) * dy) / (dx * dx + dy * dy || 1)))
+      return Math.hypot(p[0] - (x + t * dx), p[1] - (y + t * dy))
+    }))
+  const near = (poly: [number, number][], p: [number, number], r: number) => inside(poly, p) || edgeDistance(poly, p) < r
+  // The microcontroller holder sits right on the plate, so ribs must go around it entirely.
+  if (geo.connectorOrigin && c.microcontroller) {
+    for (const [minx, maxx, miny, maxy] of microControllerRectangles(c, geo.connectorOrigin, geo.boardPositions)) {
+      const corners = [[minx, miny], [maxx, miny], [maxx, maxy], [minx, maxy]]
+      const poly = corners.map(([x, y]) => toPlate(geo.connectorOrigin!.apply(new Vector(x, y, 0)))).map(p => [p[0], p[1]] as [number, number])
+      obstacles.push({ poly, bottom: -Infinity })
+    }
+  }
+  const headroom = (p: [number, number]) => Math.min(MOUNT.ribMaxHeight, ...obstacles.filter(o => near(o.poly, p, MOUNT.ribWidth / 2 + 1)).map(o => o.bottom - MOUNT.ribClearance))
+  // Ribs stay inside the walls' inner line, which can curve in (around a thumb module, for example).
+  const innerWall = geo.allWallCriticalPoints().map(w => toPlate(w.bi.origin())).map(p => [p[0], p[1]] as [number, number])
+  const withinWalls = (p: [number, number]) => inside(innerWall, p) && edgeDistance(innerWall, p) > MOUNT.ribWidth / 2 + 1
+
+  const seamResult = c.thumbModule ? thumbSeam(c, geo) : undefined
+  const seam = seamResult && 'seam' in seamResult ? seamResult.seam : undefined
+  const onMain = ([u, v]: [number, number]) => {
+    if (!seam) return true
+    const t = u * seam.along[0] + v * seam.along[1]
+    return u * seam.normal[0] + v * seam.normal[1] - seamOffsetAt(seam, t) < -seam.gap / 2 - MOUNT.ribWidth
+  }
+
+  const ribs: Rib[] = []
+  for (const screw of geo.screwPositions) {
+    const [su, sv] = toPlate(screw.origin())
+    const dx = su - center[0]
+    const dy = sv - center[1]
+    const len = Math.hypot(dx, dy) - MOUNT.ribStopShort
+    const start = MOUNT.bossDiameter / 2 - 1
+    if (len <= start + 5 || !onMain([su, sv])) continue
+    // Walk out from the boss, keeping the rib as tall as the lowest part above it allows.
+    let height = MOUNT.ribMaxHeight
+    let end = start
+    for (let d = start; d <= len; d += 2) {
+      const p: [number, number] = [center[0] + (dx * d) / (len + MOUNT.ribStopShort), center[1] + (dy * d) / (len + MOUNT.ribStopShort)]
+      const room = headroom(p)
+      if (room < MOUNT.ribMinHeight || !onMain(p) || !withinWalls(p)) break
+      height = Math.min(height, room)
+      end = d
+    }
+    if (end - start < 10) continue
+    const at = (d: number) => [center[0] + (dx * d) / (len + MOUNT.ribStopShort), center[1] + (dy * d) / (len + MOUNT.ribStopShort)] as [number, number]
+    ribs.push({ from: at(start), to: at(end), height })
+  }
+  return ribs
 }
 
 /** Center of the clamp mount, in the plate sketch's coordinates (empty if there is no mount). */
@@ -440,6 +534,14 @@ function addClampMount(c: Cuttleform, geo: PlateParams, plate: Solid) {
       .sketchOnPlane('XY', [x, y, pocketBottom])
       .extrude(MOUNT.bossHeight - pocketBottom + 1) as Solid
     result = result.cut(nut)
+  }
+  for (const rib of clampMountRibs(c, geo as Geometry)) {
+    const length = Math.hypot(rib.to[0] - rib.from[0], rib.to[1] - rib.from[1])
+    const dir = new Vector((rib.to[0] - rib.from[0]) / length, (rib.to[1] - rib.from[1]) / length, 0)
+    const frame = new Trsf().coordSystemChange(new Vector(rib.from[0], rib.from[1], 0), dir, new Vector(0, 0, 1))
+    // Start the rib inside the boss so the two fuse; the nut pocket is cut first and stays clear.
+    const box = makeBox([0, -MOUNT.ribWidth / 2, -0.5], [length, MOUNT.ribWidth / 2, rib.height]) as Solid
+    result = result.fuse(frame.transform(box))
   }
   return result
 }
