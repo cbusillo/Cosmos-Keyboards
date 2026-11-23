@@ -928,7 +928,6 @@
               <table class="text-xs mt-1 mb-2">
                 <tr class="opacity-70">
                   <th class="pr-2 text-left">Key</th>
-                  <th class="pr-2" title="Whether your thumb can reach the key at all">Reach</th>
                   <th class="pr-2" title="Distance from your resting thumb pad to the key top">Move</th>
                   <th
                     class="pr-2"
@@ -945,7 +944,6 @@
                 {#each tf.keys as k, i}
                   <tr>
                     <td class="pr-2">{i + 1}</td>
-                    <td class="pr-2 text-center">{k.reachable ? 'yes' : 'no'}</td>
                     <td class="pr-2 text-right">{k.travel.toFixed(0)} mm</td>
                     <td class="pr-2 text-right">{k.depth > 0 ? '+' : ''}{k.depth.toFixed(0)} mm</td>
                     <td class="pr-2 text-right">{k.pressAngle.toFixed(0)}°</td>
@@ -1971,7 +1969,7 @@
             {#each tf.keys as k}
               <T.Mesh position={k.top.toArray()}>
                 <T.SphereGeometry args={[1.5, 12, 8]} />
-                <T.MeshBasicMaterial color={k.reachable ? '#22c55e' : '#ef4444'} />
+                <T.MeshBasicMaterial color="#22c55e" />
               </T.Mesh>
             {/each}
           {/if}

@@ -93,8 +93,6 @@ export function ballCenterUnderThumb(rest: ThumbRest, ballDiameter: number) {
 }
 
 export interface ThumbKeyReach {
-  /** Whether the thumb tip can reach the key's top at all. */
-  reachable: boolean
   /** How far the key's top is from the resting thumb pad, in mm. */
   travel: number
   /**
@@ -109,7 +107,7 @@ export interface ThumbKeyReach {
 }
 
 /**
- * How a thumb resting in `rest` gets to a key. The hand's thumb is left in the rest pose afterwards.
+ * How far a thumb resting with `opts` is from a key. The hand's thumb is left in the rest pose.
  *
  * @param keyTop Center of the keycap's top, in world coordinates.
  * @param keyUp Unit direction out of the keycap's top, in world coordinates.
@@ -118,13 +116,10 @@ export function thumbKeyReach(hand: SolvedHand, opts: ThumbRestOptions, keyTop: 
   const rest = thumbRest(hand, opts)
   const base = rest.joints[1]
   const thumbLength = rest.joints.slice(1).reduce((sum, p, i, ps) => (i ? sum + p.distanceTo(ps[i - 1]) : 0), 0)
-  const reachable = hand.ik('thumb', keyTop, 1000) !== false
-  thumbRest(hand, opts)
 
   const toKey = new Vector3().subVectors(keyTop, rest.pad)
   const pressDown = keyUp.clone().negate()
   return {
-    reachable,
     travel: toKey.length(),
     depth: toKey.dot(rest.press),
     pressAngle: (Math.acos(Math.max(-1, Math.min(1, pressDown.dot(rest.press)))) * 180) / Math.PI,
