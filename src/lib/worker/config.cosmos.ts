@@ -114,6 +114,7 @@ export type CosmosKeyboard =
     connectors: ConnectorMaybeCustom[]
     mirrorConnectors: boolean
     plate: Cuttleform['plate']
+    clampMount: Cuttleform['clampMount']
     layout: Layout
   }
   & ScrewFlags
@@ -366,6 +367,7 @@ export function toCosmosConfig(conf: Cuttleform, side: KeyboardSide, overrideWri
     rounded: conf.rounded,
     shell: conf.shell,
     plate: conf.plate,
+    clampMount: conf.clampMount,
     wristRestEnable: !!conf.wristRestRight,
     connectorLeftIndex: side === 'center' ? -1 : conf.connectorIndex,
     connectorRightIndex: side === 'center' ? -1 : conf.connectorIndex,
@@ -515,6 +517,7 @@ export function sideFromCosmosConfig(c: CosmosKeyboard, side: KeyboardSide, flip
     wristRestOrigin: new ETrsf().translate(wrPos[0] / 10, wrPos[1] / 10, wrPos[2] / 10),
     shell: c.shell,
     plate: c.plate,
+    clampMount: c.clampMount,
   }
   const clusters: CosmosCluster[] = c.clusters.filter(c => side == 'unibody' || c.side == side)
   // Add mirrored fingers

@@ -123,6 +123,20 @@ test('Center cluster encoding round-trip', () => {
   expect(decoded.connectorCenterIndex).toBe(7)
 })
 
+test('Clamp mount survives encoding and reaches the model config', () => {
+  const config = cuttleConf(defaultConfig.options as any)
+  const cosmos = toCosmosConfig(config, 'right', true)
+  cosmos.wristRestPosition = 0n
+  cosmos.clampMount = { spacing: 42.5, angle: -30, offsetX: 3.2, offsetY: -7.5 }
+
+  const decoded = decodeConfigIdk(serializeCosmosConfig(encodeCosmosConfig(cosmos)))
+  expect(decoded.clampMount).toEqual({ spacing: 42.5, angle: -30, offsetX: 3.2, offsetY: -7.5 })
+  expect(fromCosmosConfig(decoded).right!.clampMount).toEqual(decoded.clampMount)
+
+  cosmos.clampMount = undefined
+  expect(decodeConfigIdk(serializeCosmosConfig(encodeCosmosConfig(cosmos))).clampMount).toBeUndefined()
+})
+
 test('Old URL without center cluster decodes cleanly', () => {
   // The default-config URL — does NOT contain a center cluster
   const encoded =

@@ -268,6 +268,10 @@ const KEYBOARD_EXTRA_DEFAULTS: KeyboardExtra = {
   footIndices: [],
   footDiameter: 100,
   footHeight: 25,
+  mountSpacing: 0,
+  mountAngle: 0,
+  mountOffsetX: 0,
+  mountOffsetY: 0,
 }
 
 const TILT_DEFAULTS: TiltShell = {
@@ -551,6 +555,14 @@ export function decodeConfigIdk(b64: string): CosmosKeyboard {
         footHeight: keebExtra.footHeight / 10,
       }
       : undefined,
+    clampMount: keebExtra.mountSpacing
+      ? {
+        spacing: keebExtra.mountSpacing / 10,
+        angle: keebExtra.mountAngle,
+        offsetX: keebExtra.mountOffsetX / 10,
+        offsetY: keebExtra.mountOffsetY / 10,
+      }
+      : undefined,
     layout: decodeLayout(keeb.layoutId),
   }
   return conf
@@ -759,6 +771,10 @@ export function encodeCosmosConfig(conf: CosmosKeyboard): Keyboard {
       footIndices: conf.plate?.footIndices?.map(i => Math.round(i * 10) + 10) || [],
       footDiameter: conf.plate?.footDiameter ? Math.round(conf.plate.footDiameter * 10) : undefined,
       footHeight: conf.plate?.footHeight ? Math.round(conf.plate.footHeight * 10) : undefined,
+      mountSpacing: conf.clampMount ? Math.round(conf.clampMount.spacing * 10) : undefined,
+      mountAngle: conf.clampMount ? Math.round(conf.clampMount.angle) : undefined,
+      mountOffsetX: conf.clampMount ? Math.round(conf.clampMount.offsetX * 10) : undefined,
+      mountOffsetY: conf.clampMount ? Math.round(conf.clampMount.offsetY * 10) : undefined,
     },
   }
 }

@@ -76,6 +76,11 @@ message KeyboardExtra {
   optional uint32 foot_height = 24;
   optional uint32 plate_art = 22;
   optional int32 connector_center_index = 23;
+  // Clamp mount: two bolts through the bottom plate for an Arca-Swiss rail. Spacing 0 means no mount.
+  optional uint32 mount_spacing = 25; // tenths of a mm between the bolts
+  optional sint32 mount_angle = 26; // degrees, rail direction from the plate's x axis
+  optional sint32 mount_offset_x = 27; // tenths of a mm from the plate's center
+  optional sint32 mount_offset_y = 28; // tenths of a mm from the plate's center
 }
 
 message Curvature {

@@ -136,7 +136,19 @@ export interface SpecificCuttleform<S> {
     footDiameter: number
     footHeight: number
   }
+  /** Two bolts through the bottom plate for mounting the keyboard on an Arca-Swiss rail. */
+  clampMount?: ClampMount
   shell: S
+}
+
+export interface ClampMount {
+  /** Distance between the two bolts, in mm. */
+  spacing: number
+  /** Direction of the rail, in degrees from the plate's x-axis. */
+  angle: number
+  /** Offset of the bolts' midpoint from the plate's center, in mm. */
+  offsetX: number
+  offsetY: number
 }
 
 export type Cuttleform = SpecificCuttleform<AnyShell>

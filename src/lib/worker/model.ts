@@ -4,7 +4,7 @@ import { SCREWS } from '$lib/geometry/screws'
 import { processPlate } from '@pro/art'
 import { wallBezier } from '@pro/rounded'
 import { makeStiltsPlate, makeStiltsPlateSimpleMesh, splitStiltsScrewInserts } from '@pro/stiltsModel'
-import { cast, CornerFinder, downcast, draw, drawCircle, Drawing, drawRoundedRectangle, Face, loft, type Point, type Sketch, Sketcher, Solid } from 'replicad'
+import { cast, CornerFinder, downcast, draw, drawCircle, drawPolysides, drawRoundedRectangle, Face, loft, makeCylinder, type Sketch, Sketcher, Solid } from 'replicad'
 import type { TiltGeometry } from './cachedGeometry'
 import { createTriangleMap } from './concaveman'
 import { convertToMaybeCustomConnectors, type Cuttleform, type Geometry } from './config'
@@ -392,9 +392,60 @@ interface PlateParams {
   footPositions: Geometry['footPositions']
 }
 
+/**
+ * Clamp mount: two M4 bolts come up from below through a metal Arca-Swiss rail and the plate, into
+ * hex nuts held in bosses on the plate's inner face. Metal threads take the load, and two bolts stop
+ * the keyboard twisting on the rail.
+ */
+const MOUNT = {
+  holeDiameter: 4.5, // M4 clearance
+  bossDiameter: 13,
+  bossHeight: 6, // above the plate's inner face
+  nutAcrossFlats: 7.3, // M4 nut is 7 mm across flats, plus printing clearance
+  nutDepth: 3.6, // M4 nut is 3.2 mm thick
+}
+
+/** Bolt centers of the clamp mount, in the plate sketch's coordinates. */
+export function clampMountPositions(c: Cuttleform, geo: PlateParams): [number, number][] {
+  if (!c.clampMount) return []
+  const pts = geo.allWallCriticalPoints().map(w => [w.bo.origin().dot(geo.worldX), w.bo.origin().dot(geo.worldY)])
+  // Area centroid of the plate outline (shoelace formula)
+  let area = 0, cx = 0, cy = 0
+  for (let i = 0; i < pts.length; i++) {
+    const [x0, y0] = pts[i]
+    const [x1, y1] = pts[(i + 1) % pts.length]
+    const cross = x0 * y1 - x1 * y0
+    area += cross
+    cx += (x0 + x1) * cross
+    cy += (y0 + y1) * cross
+  }
+  const center = [cx / (3 * area) + c.clampMount.offsetX, cy / (3 * area) + c.clampMount.offsetY]
+  const a = (c.clampMount.angle * Math.PI) / 180
+  const half = c.clampMount.spacing / 2
+  return [-1, 1].map(s => [center[0] + s * half * Math.cos(a), center[1] + s * half * Math.sin(a)] as [number, number])
+}
+
+function addClampMount(c: Cuttleform, geo: PlateParams, plate: Solid) {
+  const positions = clampMountPositions(c, geo)
+  if (!positions.length) return plate
+  let result = plate
+  for (const [x, y] of positions) {
+    result = result.fuse(makeCylinder(MOUNT.bossDiameter / 2, MOUNT.bossHeight, [x, y, 0], [0, 0, 1]))
+  }
+  for (const [x, y] of positions) {
+    const height = c.plateThickness + MOUNT.bossHeight + 2
+    result = result.cut(makeCylinder(MOUNT.holeDiameter / 2, height, [x, y, -c.plateThickness - 1], [0, 0, 1]))
+    const nut = drawPolysides(MOUNT.nutAcrossFlats / Math.sqrt(3), 6)
+      .sketchOnPlane('XY', [x, y, MOUNT.bossHeight - MOUNT.nutDepth])
+      .extrude(MOUNT.nutDepth + 1) as Solid
+    result = result.cut(nut)
+  }
+  return result
+}
+
 async function makeNormalPlate(c: Cuttleform, geo: PlateParams) {
   const sketch = plateSketch(c, geo).sketchOnPlane('XY')
-  const plate = sketch.extrude(-c.plateThickness) as Solid
+  const plate = addClampMount(c, geo, sketch.extrude(-c.plateThickness) as Solid)
   const trsf = new Trsf().coordSystemChange(new Vector(), geo.worldX, geo.worldZ).pretranslate(0, 0, geo.bottomZ)
   const transformedPlate = trsf.transform(plate)
   if (c.plate && c.shell.type !== 'tilt') return await processPlate(c, geo as Geometry, transformedPlate)
