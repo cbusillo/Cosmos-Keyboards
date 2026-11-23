@@ -35,7 +35,9 @@
   import { refine } from '../handoptim'
   import { DEFAULT_THUMB_REST } from '$lib/thumbfit'
   import {
+    arrangeThumbKeys,
     configDelta,
+    DEFAULT_ARRANGE,
     fitThumb,
     separateLeftThumbs,
     shiftedClusterMatrix,
@@ -590,6 +592,21 @@
     hands = hands
   }
 
+  let arrangeOpts = { ...DEFAULT_ARRANGE }
+
+  function arrangeButtons() {
+    protoConfig.update((proto) => {
+      if (thumbFits.left && thumbFits.right) separateLeftThumbs(proto)
+      for (const side of handSides) {
+        const fit = thumbFits[side]
+        if (!fit) continue
+        for (const { index, matrix } of arrangeThumbKeys(proto, side, fit, arrangeOpts))
+          setPose(proto, index, 'key', matrix)
+      }
+      return proto
+    })
+  }
+
   function moveBallsUnderThumbs() {
     protoConfig.update((proto) => {
       if (thumbFits.left && thumbFits.right) separateLeftThumbs(proto)
@@ -908,6 +925,34 @@
             {side == 'left' ? 'Left' : 'Right'}:
             {#if tf}
               ball is {tf.current.distanceTo(tf.target).toFixed(1)} mm from where your thumb rests
+              <table class="text-xs mt-1 mb-2">
+                <tr class="opacity-70">
+                  <th class="pr-2 text-left">Key</th>
+                  <th class="pr-2" title="Whether your thumb can reach the key at all">Reach</th>
+                  <th class="pr-2" title="Distance from your resting thumb pad to the key top">Move</th>
+                  <th
+                    class="pr-2"
+                    title="Key top past (+) or short of (-) your resting pad, in the direction your pad presses"
+                    >Depth</th
+                  >
+                  <th
+                    class="pr-2"
+                    title="Angle between the key's press and the way your pad presses; 0 is straight in"
+                    >Angle</th
+                  >
+                  <th title="Gap from the keycap edge to the ball">To ball</th>
+                </tr>
+                {#each tf.keys as k, i}
+                  <tr>
+                    <td class="pr-2">{i + 1}</td>
+                    <td class="pr-2 text-center">{k.reachable ? 'yes' : 'no'}</td>
+                    <td class="pr-2 text-right">{k.travel.toFixed(0)} mm</td>
+                    <td class="pr-2 text-right">{k.depth > 0 ? '+' : ''}{k.depth.toFixed(0)} mm</td>
+                    <td class="pr-2 text-right">{k.pressAngle.toFixed(0)}°</td>
+                    <td class="text-right">{k.gapToBall.toFixed(0)} mm</td>
+                  </tr>
+                {/each}
+              </table>
             {:else}
               needs exactly one trackball to compare
             {/if}
@@ -916,6 +961,17 @@
         {#if Object.keys(thumbFits).length}
           <button class="button" on:click={moveBallsUnderThumbs}>Move thumb clusters under thumbs</button
           >
+          <label class="flex items-center gap-2 mt-2">
+            Button gap to ball
+            <input type="range" min="0" max="15" step="0.5" bind:value={arrangeOpts.gap} />
+            {arrangeOpts.gap} mm
+          </label>
+          <label class="flex items-center gap-2">
+            Button height below thumb pad
+            <input type="range" min="-10" max="20" step="0.5" bind:value={arrangeOpts.depth} />
+            {arrangeOpts.depth} mm
+          </label>
+          <button class="button" on:click={arrangeButtons}>Arrange buttons around the ball</button>
         {/if}
       </div>
     {/if}
@@ -1912,6 +1968,12 @@
               <T.SphereGeometry args={[2, 12, 8]} />
               <T.MeshBasicMaterial color="#f97316" />
             </T.Mesh>
+            {#each tf.keys as k}
+              <T.Mesh position={k.top.toArray()}>
+                <T.SphereGeometry args={[1.5, 12, 8]} />
+                <T.MeshBasicMaterial color={k.reachable ? '#22c55e' : '#ef4444'} />
+              </T.Mesh>
+            {/each}
           {/if}
           <T.Group position={handPosition[side]} rotation={handRotation[side]} let:ref={handRef}>
             <HandModel reverse={side == 'right'} {hand} />

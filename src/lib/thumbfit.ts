@@ -91,3 +91,56 @@ export function thumbRest(hand: SolvedHand, opts = DEFAULT_THUMB_REST): ThumbRes
 export function ballCenterUnderThumb(rest: ThumbRest, ballDiameter: number) {
   return new Vector3().copy(rest.pad).addScaledVector(rest.press, ballDiameter / 2)
 }
+
+export interface ThumbKeyReach {
+  /** Whether the thumb tip can reach the key's top at all. */
+  reachable: boolean
+  /** How far the key's top is from the resting thumb pad, in mm. */
+  travel: number
+  /**
+   * Where the key's top sits along the direction the resting pad presses, in mm.
+   * Positive: past the pad, so the thumb bends further to reach it. Negative: the thumb lifts.
+   */
+  depth: number
+  /** Angle between the key's press direction and the resting pad's, in degrees. 0 presses straight in. */
+  pressAngle: number
+  /** How straight the thumb must get to reach the key: 1 is fully extended. */
+  stretch: number
+}
+
+/**
+ * How a thumb resting in `rest` gets to a key. The hand's thumb is left in the rest pose afterwards.
+ *
+ * @param keyTop Center of the keycap's top, in world coordinates.
+ * @param keyUp Unit direction out of the keycap's top, in world coordinates.
+ */
+export function thumbKeyReach(hand: SolvedHand, opts: ThumbRestOptions, keyTop: Vector3, keyUp: Vector3): ThumbKeyReach {
+  const rest = thumbRest(hand, opts)
+  const base = rest.joints[1]
+  const thumbLength = rest.joints.slice(1).reduce((sum, p, i, ps) => (i ? sum + p.distanceTo(ps[i - 1]) : 0), 0)
+  const reachable = hand.ik('thumb', keyTop, 1000) !== false
+  thumbRest(hand, opts)
+
+  const toKey = new Vector3().subVectors(keyTop, rest.pad)
+  const pressDown = keyUp.clone().negate()
+  return {
+    reachable,
+    travel: toKey.length(),
+    depth: toKey.dot(rest.press),
+    pressAngle: (Math.acos(Math.max(-1, Math.min(1, pressDown.dot(rest.press)))) * 180) / Math.PI,
+    stretch: base.distanceTo(keyTop) / thumbLength,
+  }
+}
+
+/** Space angles at least `step` apart, keeping their order and their average. */
+export function spreadAngles(items: { angle: number }[], step: number) {
+  if (items.length < 2) return
+  const start = items[0].angle
+  // Unwrap relative to the first item so a group that straddles ±180° stays together.
+  for (const it of items) it.angle = start + Math.atan2(Math.sin(it.angle - start), Math.cos(it.angle - start))
+  items.sort((a, b) => a.angle - b.angle)
+  const mean = items.reduce((a, it) => a + it.angle, 0) / items.length
+  for (let i = 1; i < items.length; i++) items[i].angle = Math.max(items[i].angle, items[i - 1].angle + step)
+  const shift = mean - items.reduce((a, it) => a + it.angle, 0) / items.length
+  for (const it of items) it.angle += shift
+}
