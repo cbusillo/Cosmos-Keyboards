@@ -70,6 +70,7 @@ function padPoint(joints: Vector3[], palmSide: Vector3) {
  * Pose a hand's thumb at rest, leaving the hand's thumb in that pose.
  *
  * @param hand A hand already placed with its fingers on the home row; only its thumb is changed.
+ * @param opts How far the thumb bends and swings toward the index finger.
  */
 export function thumbRest(hand: SolvedHand, opts = DEFAULT_THUMB_REST): ThumbRest {
   const flexion = REST_FLEXION_DEG.map((d) => (-d * opts.curl * Math.PI) / 180)
@@ -107,8 +108,10 @@ export interface ThumbKeyReach {
 }
 
 /**
- * How far a thumb resting with `opts` is from a key. The hand's thumb is left in the rest pose.
+ * How far a resting thumb is from a key. The hand's thumb is left in the rest pose.
  *
+ * @param hand A hand already placed with its fingers on the home row.
+ * @param opts How the thumb rests (see thumbRest).
  * @param keyTop Center of the keycap's top, in world coordinates.
  * @param keyUp Unit direction out of the keycap's top, in world coordinates.
  */
