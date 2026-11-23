@@ -272,6 +272,9 @@ const KEYBOARD_EXTRA_DEFAULTS: KeyboardExtra = {
   mountAngle: 0,
   mountOffsetX: 0,
   mountOffsetY: 0,
+  thumbModuleGap: 0,
+  thumbModuleAngle: 0,
+  thumbModuleOffset: 0,
 }
 
 const TILT_DEFAULTS: TiltShell = {
@@ -563,6 +566,13 @@ export function decodeConfigIdk(b64: string): CosmosKeyboard {
         offsetY: keebExtra.mountOffsetY / 10,
       }
       : undefined,
+    thumbModule: keebExtra.thumbModuleGap
+      ? {
+        gap: keebExtra.thumbModuleGap / 10,
+        angle: keebExtra.thumbModuleAngle,
+        offset: keebExtra.thumbModuleOffset / 10,
+      }
+      : undefined,
     layout: decodeLayout(keeb.layoutId),
   }
   return conf
@@ -775,6 +785,9 @@ export function encodeCosmosConfig(conf: CosmosKeyboard): Keyboard {
       mountAngle: conf.clampMount ? Math.round(conf.clampMount.angle) : undefined,
       mountOffsetX: conf.clampMount ? Math.round(conf.clampMount.offsetX * 10) : undefined,
       mountOffsetY: conf.clampMount ? Math.round(conf.clampMount.offsetY * 10) : undefined,
+      thumbModuleGap: conf.thumbModule ? Math.round(conf.thumbModule.gap * 10) : undefined,
+      thumbModuleAngle: conf.thumbModule ? Math.round(conf.thumbModule.angle) : undefined,
+      thumbModuleOffset: conf.thumbModule ? Math.round(conf.thumbModule.offset * 10) : undefined,
     },
   }
 }

@@ -81,6 +81,10 @@ message KeyboardExtra {
   optional sint32 mount_angle = 26; // degrees, rail direction from the plate's x axis
   optional sint32 mount_offset_x = 27; // tenths of a mm from the plate's center
   optional sint32 mount_offset_y = 28; // tenths of a mm from the plate's center
+  // Removable thumb module: the case splits along a seam between the finger and thumb keys. Gap 0 means no split.
+  optional uint32 thumb_module_gap = 29; // tenths of a mm, width of the seam
+  optional sint32 thumb_module_angle = 30; // degrees, turns the seam
+  optional sint32 thumb_module_offset = 31; // tenths of a mm, moves the seam toward the thumbs
 }
 
 message Curvature {

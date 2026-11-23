@@ -26,6 +26,16 @@ export class Assembly {
     return assembly
   }
 
+  /** Return a new assembly with every part replaced by fn(part); parts fn returns undefined for are dropped. */
+  map(fn: (shape: AnyShape, name: string) => AnyShape | undefined): Assembly {
+    const assembly = new Assembly()
+    for (const { name, shape } of this.parts) {
+      const mapped = fn(shape, name)
+      if (mapped) assembly.add(name, mapped)
+    }
+    return assembly
+  }
+
   /** Return a new assembly with everything transformed. */
   transform(trsf: Trsf): Assembly {
     const assembly = new Assembly()

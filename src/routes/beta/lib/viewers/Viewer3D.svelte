@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount, tick } from 'svelte'
-  import { Euler, Matrix4, Quaternion, Vector3, type BufferGeometry } from 'three'
+  import { BufferGeometry, Euler, Matrix4, Quaternion, Vector3 } from 'three'
   import {
     type Cuttleform,
     decodeTuple,
@@ -55,6 +55,7 @@
   import * as mdi from '@mdi/js'
   import Icon from '$lib/presentation/Icon.svelte'
   import { diff, mapObjNotNull, notNull, objEntries, objEntriesNotNull, objKeys } from '$lib/worker/util'
+  import { thumbSeam } from '$lib/worker/thumbModule'
   import { readHands, type HandData } from '$lib/handhelpers'
   import { simplePartGeos, simpleSocketGeos } from '$lib/loaders/simpleparts'
   import GroupMatrix from '$lib/3d/GroupMatrix.svelte'
@@ -593,6 +594,28 @@
   }
 
   let arrangeOpts = { ...DEFAULT_ARRANGE }
+
+  /** The thumb module's seam on each half, drawn just above the bottom plate. */
+  function seamLine(geo: FullGeometry[keyof FullGeometry]) {
+    if (!geo || !geo.c.thumbModule) return undefined
+    const result = thumbSeam(geo.c, geo as any)
+    if (!('seam' in result)) return undefined
+    const { seam } = result
+    const pts = seam.profile.map(([t, s]) => {
+      const u = seam.along[0] * t + seam.normal[0] * s
+      const v = seam.along[1] * t + seam.normal[1] * s
+      return geo.worldX
+        .clone()
+        .multiplyScalar(u)
+        .add(geo.worldY.clone().multiplyScalar(v))
+        .add(geo.worldZ.clone().multiplyScalar(geo.bottomZ + 0.5))
+    })
+    return new BufferGeometry().setFromPoints(pts)
+  }
+  $: seamLines = mapObjNotNull(geometry as Record<string, any>, seamLine) as Record<
+    string,
+    BufferGeometry | undefined
+  >
 
   function arrangeButtons() {
     protoConfig.update((proto) => {
@@ -1889,6 +1912,11 @@
     {@const cent = center[kbd]}
     {#if cent}
       <T.Group position={[-cent[0], -cent[1], -cent[2]]} scale.x={kbd == 'left' ? -1 : 1}>
+        {#if seamLines[kbd]}
+          <T.Line geometry={seamLines[kbd]}>
+            <T.LineBasicMaterial color="#14b8a6" />
+          </T.Line>
+        {/if}
         <Keyboard
           geometry={geo}
           {transparency}

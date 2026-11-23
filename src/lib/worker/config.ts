@@ -138,7 +138,18 @@ export interface SpecificCuttleform<S> {
   }
   /** Two 1/4-20 bolts through the bottom plate for mounting the keyboard on an Arca-Swiss plate. */
   clampMount?: ClampMount
+  /** Split the thumb cluster into its own piece, joined to the main case by adjustable straps. */
+  thumbModule?: ThumbModule
   shell: S
+}
+
+export interface ThumbModule {
+  /** Width of the seam between the main case and the thumb module, in mm. */
+  gap: number
+  /** Turns the seam from its automatic direction, in degrees. */
+  angle: number
+  /** Moves the seam toward the thumb keys (or away, if negative), in mm. */
+  offset: number
 }
 
 export interface ClampMount {

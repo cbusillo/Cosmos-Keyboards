@@ -38,6 +38,7 @@ import { Splitter } from './modeling/splitter'
 import Trsf from './modeling/transformation'
 import { Vector } from './modeling/transformation'
 import { keyHole } from './socketsLoader'
+import { addStrapBosses } from './thumbModule'
 import { mapObj, sum } from './util'
 
 const ACCENT_HEIGHT = 1.5
@@ -447,7 +448,7 @@ function addClampMount(c: Cuttleform, geo: PlateParams, plate: Solid) {
 
 async function makeNormalPlate(c: Cuttleform, geo: PlateParams) {
   const sketch = plateSketch(c, geo).sketchOnPlane('XY')
-  const plate = addClampMount(c, geo, sketch.extrude(-c.plateThickness) as Solid)
+  const plate = addStrapBosses(c, geo as Geometry, addClampMount(c, geo, sketch.extrude(-c.plateThickness) as Solid))
   const trsf = new Trsf().coordSystemChange(new Vector(), geo.worldX, geo.worldZ).pretranslate(0, 0, geo.bottomZ)
   const transformedPlate = trsf.transform(plate)
   if (c.plate && c.shell.type !== 'tilt') return await processPlate(c, geo as Geometry, transformedPlate)

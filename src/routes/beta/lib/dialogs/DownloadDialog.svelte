@@ -334,6 +334,24 @@
             </div>
           {/if}
         </div>
+        {#if Object.values(config).some((c) => c.thumbModule)}
+          <div class="break-inside-avoid">
+            <h3 class="mb-2 mt-4 text-lg semibold text-black dark:text-white">Thumb Module</h3>
+            {#each [['model-main', 'Main Case'], ['model-module', 'Module'], ['plate-main', 'Main Plate'], ['plate-module', 'Module Plate'], ['straps', 'Straps']] as [model, label]}
+              <div class="inline-flex items-center gap-2 flex-wrap justify-center mb-2">
+                {#each configKeys.filter((k) => k != 'center') as kbd}
+                  <button class="button flex items-center gap-2" on:click={() => downloadSTL(model, kbd)}
+                    ><Icon path={iconPath(kbd)} />{kbdName(kbd, label)}</button
+                  >
+                {/each}
+              </div>
+            {/each}
+            <div class="text-sm opacity-70 text-center pb-1">
+              Use these in place of the case and plate. Each strap needs two M3 bolts with nuts, and a
+              large M3 washer under the module's bolt.
+            </div>
+          </div>
+        {/if}
         {#if Object.values(config).some((c) => c.microcontroller)}
           <div class="break-inside-avoid">
             <h3 class="mb-2 mt-4 text-lg semibold text-black dark:text-white">Microcontroller Holder</h3>

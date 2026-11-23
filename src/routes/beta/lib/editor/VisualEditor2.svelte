@@ -46,6 +46,8 @@
   import Select from '$lib/presentation/Select.svelte'
   import { capitalize, mapObjNotNull, notNull, objEntries, objKeys } from '$lib/worker/util'
   import { profileName, sortProfiles } from '../viewers/viewer3dHelpers'
+  import { newGeometry } from '$lib/worker/config'
+  import { screwsPerSide, thumbSeam } from '$lib/worker/thumbModule'
   import { encodeVariant, PART_INFO } from '$lib/geometry/socketsParts'
   import DecimalInputInherit from './DecimalInputInherit.svelte'
   import {
@@ -583,6 +585,30 @@
 
   const DISPARITY_HELP =
     "Bends the inner and outer parts of the curve by unequal amounts. At 0 they're equal."
+
+  /** Whether each half's thumb seam fits, and how many plate screws each piece keeps. */
+  function describeThumbModule(proto: typeof $protoConfig) {
+    if (!proto.thumbModule) return []
+    const full = fromCosmosConfig(proto)
+    return (['left', 'right', 'unibody'] as const).flatMap((side) => {
+      const conf = full[side]
+      if (!conf) return []
+      const name = side == 'left' ? 'Left' : side == 'right' ? 'Right' : 'Unibody'
+      const result = thumbSeam(conf, newGeometry(conf))
+      if (!('seam' in result)) return [{ error: true, text: `${name}: ${result.error}` }]
+      const screws = screwsPerSide(newGeometry(conf), result.seam)
+      const few = screws.module < 2
+      return [
+        {
+          error: few,
+          text:
+            `${name}: the module keeps ${screws.module} of the plate screws and the main case ${screws.main}.` +
+            (few ? ' Add plate screws on the module so it stays on its plate.' : ''),
+        },
+      ]
+    })
+  }
+  $: thumbModuleStatus = describeThumbModule($protoConfig)
 </script>
 
 <Section name="Upper Keys">
@@ -1450,6 +1476,27 @@
         <Checkbox bind:value={$protoConfig.screwCountersink} />
       </Field>
     {/if}
+  {/if}
+  <Field
+    name="Thumb Module"
+    icon="screw"
+    help="Print each thumb cluster as its own piece. Two straps under the seam join it to the main case: the module's bolts sit in oversized holes under large washers, so it can slide and turn a few millimeters before you tighten them, and shims raise or tilt it. For bigger moves, change the thumb cluster and reprint only the module."
+  >
+    <CheckboxOpt bind:value={$protoConfig.thumbModule} def={{ gap: 4, angle: 0, offset: 0 }} />
+  </Field>
+  {#if $protoConfig.thumbModule}
+    <Field name="Seam Width">
+      <DecimalInput bind:value={$protoConfig.thumbModule.gap} units="mm" />
+    </Field>
+    <Field name="Seam Angle">
+      <AngleInput bind:value={$protoConfig.thumbModule.angle} />
+    </Field>
+    <Field name="Seam Offset">
+      <DecimalInput bind:value={$protoConfig.thumbModule.offset} units="mm" />
+    </Field>
+    {#each thumbModuleStatus as line}
+      <p class="text-sm mx-4 mb-2" class:text-red-600={line.error}>{line.text}</p>
+    {/each}
   {/if}
   <Field
     name="Clamp Mount"

@@ -23,6 +23,7 @@ import { blobSTL, combine, type ShapeMesh } from './modeling/index'
 import { meshVolume, supportMesh } from './modeling/supports'
 import Trsf, { Vector } from './modeling/transformation'
 import ETrsf from './modeling/transformation-ext'
+import { makeStraps, splitAtSeam, thumbSeam } from './thumbModule'
 
 let oc: OpenCascadeInstance
 let ocTime = 0
@@ -316,6 +317,24 @@ async function getModel(conf: Cuttleform, name: string, stitchWalls: boolean, fl
     }
     assembly = assembly.transform(new Trsf().translate(0, 0, -geo.floorZ))
     return assembly
+  } else if (name == 'model-main' || name == 'model-module') {
+    const seam = requireSeam(conf, geometry)
+    const model = (await getModel(conf, 'model', stitchWalls, flip)) as Assembly
+    const side = name == 'model-main' ? 'main' : 'module'
+    // getModel moved the model down by floorZ, so move the seam's boxes the same way.
+    const down = new Trsf().translate(0, 0, -geometry.floorZ)
+    const up = new Trsf().translate(0, 0, geometry.floorZ)
+    return model.map(shape => {
+      const part = splitAtSeam(geometry, seam, up.transform(shape as Solid), side)
+      return part ? down.transform(part) : undefined
+    })
+  } else if (name == 'plate-main' || name == 'plate-module') {
+    const seam = requireSeam(conf, geometry)
+    const plate = await makePlate(conf, geometry, true, true).top()
+    return splitAtSeam(geometry, seam, plate, name == 'plate-main' ? 'main' : 'module')?.translateZ(-geometry.floorZ)
+  } else if (name == 'straps') {
+    requireSeam(conf, geometry)
+    return makeStraps(conf, geometry)?.translateZ(-geometry.floorZ)
   } else if (name == 'plate' || name == 'platetop') {
     return (await makePlate(conf, geometry, true, true).top()).translateZ(-geometry.floorZ)
   } else if (name == 'platebottom') {
@@ -328,6 +347,12 @@ async function getModel(conf: Cuttleform, name: string, stitchWalls: boolean, fl
   } else {
     throw new Error("I don't know what model you want")
   }
+}
+
+function requireSeam(conf: Cuttleform, geometry: Geometry) {
+  const result = thumbSeam(conf, geometry)
+  if (!('seam' in result)) throw new Error(result.error)
+  return result.seam
 }
 
 export async function getSTL(conf: Cuttleform, name: string, side: KeyboardSide | 'test', stitchWalls: boolean) {
