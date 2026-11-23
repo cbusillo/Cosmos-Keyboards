@@ -136,7 +136,7 @@ export interface SpecificCuttleform<S> {
     footDiameter: number
     footHeight: number
   }
-  /** Two 1/4-20 bolts through the bottom plate for mounting the keyboard on an Arca-Swiss plate. */
+  /** A captured 1/4-20 nut in the bottom plate for a camera arm or desk clamp's screw. */
   clampMount?: ClampMount
   /** Split the thumb cluster into its own piece, joined to the main case by adjustable straps. */
   thumbModule?: ThumbModule
@@ -153,11 +153,7 @@ export interface ThumbModule {
 }
 
 export interface ClampMount {
-  /** Distance between the two bolts, in mm. */
-  spacing: number
-  /** Direction of the rail, in degrees from the plate's x-axis. */
-  angle: number
-  /** Offset of the bolts' midpoint from the plate's center, in mm. */
+  /** Offset of the nut from the plate's center, in mm. */
   offsetX: number
   offsetY: number
 }

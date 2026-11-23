@@ -394,21 +394,22 @@ interface PlateParams {
 }
 
 /**
- * Clamp mount: two 1/4-20 bolts through the plate into a metal Arca-Swiss plate or rail (Arca slots
- * and threads are 1/4-20). Each hole has a boss on the plate's inner face with a hex pocket. With a
- * plate whose screws point up, the pocket holds a 1/4-20 nut; with a plate that has threaded holes,
- * a screw goes in from inside and the pocket seats its head or washer. Two bolts stop the keyboard
- * twisting on the plate.
+ * Clamp mount: the 1/4-20 screw on a camera arm or desk clamp threads into a plain 1/4-20 hex nut
+ * held in a pocket in the bottom plate, near the plate's center. The nut sits on a thin floor of
+ * plastic, so a short arm screw still reaches it, and when the arm's locking ring is tightened that
+ * floor is squeezed between the ring and the nut rather than pulled. A boss on the inner face keeps
+ * the nut from turning and stiffens the plate around it.
  */
 const MOUNT = {
   holeDiameter: 6.8, // 1/4" clearance
-  bossDiameter: 19,
-  bossHeight: 8, // above the plate's inner face
+  bossDiameter: 22,
+  bossHeight: 7, // above the plate's inner face
   nutAcrossFlats: 11.5, // 1/4-20 hex nut is 7/16" (11.1 mm) across flats, plus printing clearance
-  nutDepth: 6, // 1/4-20 hex nut is 7/32" (5.6 mm) thick
+  /** Plastic between the plate's outer face and the nut, in mm. The arm screw must reach past it. */
+  floor: 2,
 }
 
-/** Bolt centers of the clamp mount, in the plate sketch's coordinates. */
+/** Center of the clamp mount, in the plate sketch's coordinates (empty if there is no mount). */
 export function clampMountPositions(c: Cuttleform, geo: PlateParams): [number, number][] {
   if (!c.clampMount) return []
   const pts = geo.allWallCriticalPoints().map(w => [w.bo.origin().dot(geo.worldX), w.bo.origin().dot(geo.worldY)])
@@ -422,10 +423,7 @@ export function clampMountPositions(c: Cuttleform, geo: PlateParams): [number, n
     cx += (x0 + x1) * cross
     cy += (y0 + y1) * cross
   }
-  const center = [cx / (3 * area) + c.clampMount.offsetX, cy / (3 * area) + c.clampMount.offsetY]
-  const a = (c.clampMount.angle * Math.PI) / 180
-  const half = c.clampMount.spacing / 2
-  return [-1, 1].map(s => [center[0] + s * half * Math.cos(a), center[1] + s * half * Math.sin(a)] as [number, number])
+  return [[cx / (3 * area) + c.clampMount.offsetX, cy / (3 * area) + c.clampMount.offsetY]]
 }
 
 function addClampMount(c: Cuttleform, geo: PlateParams, plate: Solid) {
@@ -434,13 +432,13 @@ function addClampMount(c: Cuttleform, geo: PlateParams, plate: Solid) {
   let result = plate
   for (const [x, y] of positions) {
     result = result.fuse(makeCylinder(MOUNT.bossDiameter / 2, MOUNT.bossHeight, [x, y, 0], [0, 0, 1]))
-  }
-  for (const [x, y] of positions) {
     const height = c.plateThickness + MOUNT.bossHeight + 2
     result = result.cut(makeCylinder(MOUNT.holeDiameter / 2, height, [x, y, -c.plateThickness - 1], [0, 0, 1]))
+    // The nut drops in from inside the case and rests on the floor.
+    const pocketBottom = -c.plateThickness + MOUNT.floor
     const nut = drawPolysides(MOUNT.nutAcrossFlats / Math.sqrt(3), 6)
-      .sketchOnPlane('XY', [x, y, MOUNT.bossHeight - MOUNT.nutDepth])
-      .extrude(MOUNT.nutDepth + 1) as Solid
+      .sketchOnPlane('XY', [x, y, pocketBottom])
+      .extrude(MOUNT.bossHeight - pocketBottom + 1) as Solid
     result = result.cut(nut)
   }
   return result

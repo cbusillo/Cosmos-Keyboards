@@ -1501,20 +1501,11 @@
   <Field
     name="Clamp Mount"
     icon="screw"
-    help="Two 1/4-20 bolts through the bottom plate into a metal Arca-Swiss plate, for mounting on a camera arm or desk clamp. Bosses inside the case hold a 1/4-20 nut, or seat a screw head when the plate has threaded holes. Set the bolt spacing to match your plate."
+    help="A pocket in the bottom plate holds a plain 1/4-20 hex nut, so a camera arm or desk clamp's screw threads straight in. Drop the nut in from inside before closing the case. The arm's screw needs to reach about 6 mm past the plate's outside face."
   >
-    <CheckboxOpt
-      bind:value={$protoConfig.clampMount}
-      def={{ spacing: 40, angle: 0, offsetX: 0, offsetY: 0 }}
-    />
+    <CheckboxOpt bind:value={$protoConfig.clampMount} def={{ offsetX: 0, offsetY: 0 }} />
   </Field>
   {#if $protoConfig.clampMount}
-    <Field name="Bolt Spacing">
-      <DecimalInput bind:value={$protoConfig.clampMount.spacing} units="mm" />
-    </Field>
-    <Field name="Rail Angle">
-      <AngleInput bind:value={$protoConfig.clampMount.angle} />
-    </Field>
     <Field name="Mount Offset X">
       <DecimalInput bind:value={$protoConfig.clampMount.offsetX} units="mm" />
     </Field>

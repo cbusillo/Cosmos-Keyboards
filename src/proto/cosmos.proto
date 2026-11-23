@@ -76,9 +76,9 @@ message KeyboardExtra {
   optional uint32 foot_height = 24;
   optional uint32 plate_art = 22;
   optional int32 connector_center_index = 23;
-  // Clamp mount: two bolts through the bottom plate for an Arca-Swiss rail. Spacing 0 means no mount.
-  optional uint32 mount_spacing = 25; // tenths of a mm between the bolts
-  optional sint32 mount_angle = 26; // degrees, rail direction from the plate's x axis
+  // Clamp mount: a captured 1/4-20 nut in the bottom plate for an arm's screw.
+  optional uint32 mount_enabled = 25; // nonzero when the plate has the mount
+  reserved 26; // was the rail angle of an earlier two-bolt design
   optional sint32 mount_offset_x = 27; // tenths of a mm from the plate's center
   optional sint32 mount_offset_y = 28; // tenths of a mm from the plate's center
   // Removable thumb module: the case splits along a seam between the finger and thumb keys. Gap 0 means no split.
