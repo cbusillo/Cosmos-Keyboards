@@ -125,13 +125,15 @@ export interface ArrangeOptions {
   gap: number
   /** Key tops sit this far past the resting pad, in the direction it presses, in mm. */
   depth: number
+  /** Turns the whole group of buttons around the ball, in degrees. */
+  turn: number
 }
 
 /**
  * The ball's cup is about 4 mm wider than the ball (see socketsParts.ts) and sits level with the key
  * sockets, so a 6 mm gap leaves the sockets clear of it.
  */
-export const DEFAULT_ARRANGE: ArrangeOptions = { gap: 6, depth: 3 }
+export const DEFAULT_ARRANGE: ArrangeOptions = { gap: 6, depth: 3, turn: 0 }
 
 /** World position of the n^th proto key's origin, as cosmosKeyPosition places it. */
 function protoKeyMatrix(proto: CosmosKeyboard, n: number) {
@@ -185,7 +187,9 @@ export function arrangeThumbKeys(proto: CosmosKeyboard, side: HandSide, fit: Thu
   const innerRadius = radius - KEY_FOOTPRINT / 2
   spreadAngles(keys, 2 * Math.asin(Math.min(1, (KEY_FOOTPRINT + KEY_CLEARANCE) / (2 * innerRadius))))
 
-  return keys.map(({ index, m, key, angle }) => {
+  return keys.map(({ index, m, key, angle: spread }) => {
+    // The left hand is a mirror image, so the same turn goes the other way around its ball.
+    const angle = spread + ((side == 'left' ? -1 : 1) * opts.turn * Math.PI) / 180
     const out = u.clone().multiplyScalar(Math.cos(angle)).addScaledVector(v, Math.sin(angle))
     const targetTop = pad.clone().addScaledVector(press, opts.depth).addScaledVector(out, radius)
 

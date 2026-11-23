@@ -594,6 +594,8 @@
   }
 
   let arrangeOpts = { ...DEFAULT_ARRANGE }
+  /** Which halves "Arrange buttons" changes; each hand rests differently, so they may need different settings. */
+  let arrangeSides: 'both' | HandSide = 'both'
 
   /** The thumb module's seam on each half, drawn just above the bottom plate. */
   function seamLine(geo: FullGeometry[keyof FullGeometry]) {
@@ -622,7 +624,7 @@
       if (thumbFits.left && thumbFits.right) separateLeftThumbs(proto)
       for (const side of handSides) {
         const fit = thumbFits[side]
-        if (!fit) continue
+        if (!fit || (arrangeSides != 'both' && arrangeSides != side)) continue
         for (const { index, matrix } of arrangeThumbKeys(proto, side, fit, arrangeOpts))
           setPose(proto, index, 'key', matrix)
       }
@@ -991,6 +993,19 @@
             Button height below thumb pad
             <input type="range" min="-10" max="20" step="0.5" bind:value={arrangeOpts.depth} />
             {arrangeOpts.depth} mm
+          </label>
+          <label class="flex items-center gap-2">
+            Turn buttons around the ball
+            <input type="range" min="-90" max="90" step="5" bind:value={arrangeOpts.turn} />
+            {arrangeOpts.turn}°
+          </label>
+          <label class="flex items-center gap-2">
+            Arrange
+            <select bind:value={arrangeSides} class="bg-transparent">
+              <option value="both">both halves</option>
+              <option value="left">left half only</option>
+              <option value="right">right half only</option>
+            </select>
           </label>
           <button class="button" on:click={arrangeButtons}>Arrange buttons around the ball</button>
         {/if}
